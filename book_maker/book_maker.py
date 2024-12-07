@@ -23,7 +23,7 @@ class BookGenerator:
         completion = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "You are a professional book writer and editor."},
+                {"role": "system", "content": "You are a creative and engaging book writer, skilled at adapting your writing style to the topic and audience."},
                 {"role": "user", "content": prompt}
             ],
             temperature=self.temperature,
@@ -34,14 +34,15 @@ class BookGenerator:
         """Generate detailed markdown outline for a chapter"""
         print(f"\nGenerating outline for chapter: {chapter_title}")
         outline_prompt = f"""
-        Create a detailed markdown outline for the chapter "{chapter_title}" in a book about {self.topic}.
-        Include:
-        - Main points to be covered
-        - Subtopics and their key elements
-        - Examples and case studies to be included
-        - Key takeaways
+        Create a detailed and engaging outline for the chapter "{chapter_title}" in a book about {self.topic}.
+        Consider the narrative flow and reader engagement while including:
+        - Key story elements or concepts to cover
+        - Natural progression of ideas
+        - Engaging subtopics and their development
+        - Points where examples or illustrations would be effective
         
         Format in proper markdown with headers, bullet points, and nested lists.
+        Make the structure flow naturally and keep the reader engaged throughout.
         """
         return self.generate_text(outline_prompt)
 
@@ -49,31 +50,43 @@ class BookGenerator:
         """Clean and improve chapter content"""
         print("Cleaning and improving chapter content...")
         cleaning_prompt = f"""
-        Review and improve this book chapter content. Make it:
-        1. Flow naturally like a professional book
-        2. Remove any AI-like language or artifacts
-        3. Ensure consistent tone and style
-        4. Fix any grammatical or structural issues
-        5. Format section titles properly:
-           - Main sections start with ##
-           - Subsections start with ###
-           - No asterisks or other markdown formatting
-           - Keep only essential bullet points
-           - Ensure proper paragraph breaks
+        Review and enhance this chapter content for maximum engagement and clarity. Make it:
+        1. Flow naturally with a captivating narrative style
+        2. Maintain consistent tone and voice throughout
+        3. Use clear, audience-appropriate language
+        4. Include smooth transitions between sections
+        5. Format properly with:
+           - Clear section headings (##)
+           - Well-organized subsections (###)
+           - Clean formatting without markdown artifacts
+           - Natural paragraph breaks
+           - Engaging opening and closing for each section
         
-        Content to clean:
+        Content to enhance:
         {content}
         """
         return self.generate_text(cleaning_prompt)
 
     def create_chapter_pdf(self, title, content, chapter_dir):
         """Create PDF for a single chapter with professional formatting"""
-        pdf = FPDF()
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_page()
-        
-        # Set margins
-        pdf.set_margins(25, 25, 25)
+        from fpdf import FPDF
+
+        class PDF(FPDF):
+            def __init__(self):
+                super().__init__()
+                self.add_page()
+                self.set_auto_page_break(auto=True, margin=15)
+                self.set_margins(15, 15, 15)
+
+            def header(self):
+                pass
+
+            def footer(self):
+                self.set_y(-15)
+                self.set_font('Helvetica', 'I', 8)
+                self.cell(0, 10, f'Page {self.page_no()}', align='C')
+
+        pdf = PDF()
         
         def clean_text(text):
             """Clean text of problematic characters"""
@@ -85,84 +98,77 @@ class BookGenerator:
                 '–': '-',
                 '—': '-',
                 '…': '...',
-                '\u2019': "'",  # Right single quotation mark
-                '\u2018': "'",  # Left single quotation mark
-                '\u201C': '"',  # Left double quotation mark
-                '\u201D': '"',  # Right double quotation mark
-                '\u2013': '-',  # En dash
-                '\u2014': '-',  # Em dash
-                '\u2022': '-',  # Bullet point
+                '\u2019': "'",
+                '\u2018': "'",
+                '\u201C': '"',
+                '\u201D': '"',
+                '\u2013': '-',
+                '\u2014': '-',
+                '\u2022': '-',
+                '\u2026': '...',
+                '\u201c': '"',
+                '\u201d': '"',
+                '*': '',
+                '**': ''
             }
             for old, new in replacements.items():
                 text = text.replace(old, new)
-            return text.encode('ascii', 'replace').decode('ascii')
+            
+            # Replace any remaining non-ASCII characters
+            text = ''.join(char if ord(char) < 128 else '-' for char in text)
+            
+            # Ensure there's always some space
+            text = text.strip()
+            if not text:
+                return " "
+            return text
         
         # Chapter title
-        pdf.set_font('Helvetica', 'B', 24)
-        pdf.cell(0, 20, f"Chapter {clean_text(title)}", ln=True, align='L')
-        pdf.ln(10)
+        pdf.set_font('Helvetica', 'B', 20)
+        pdf.cell(0, 15, f"Chapter: {clean_text(title)}", ln=True, align='L')
+        pdf.ln(5)
+
+        # Process content
+        paragraphs = content.split('\n\n')
         
-        # Process content sections
-        sections = content.split('\n## ')
-        
-        for section in sections:
-            if section.strip():
-                # Handle section titles (## level)
-                if '##' in section:
-                    parts = section.split('\n', 1)
-                    pdf.set_font('Helvetica', 'B', 16)
-                    pdf.cell(0, 10, clean_text(parts[0].replace('#', '').strip()), ln=True)
+        for paragraph in paragraphs:
+            paragraph = paragraph.strip()
+            if not paragraph:
+                continue
+
+            try:
+                # Handle headers
+                if paragraph.startswith('# '):
+                    continue  # Skip chapter title
+                elif paragraph.startswith('## '):
+                    pdf.set_font('Helvetica', 'B', 14)
                     pdf.ln(5)
-                    content = parts[1] if len(parts) > 1 else ""
+                    pdf.multi_cell(0, 6, clean_text(paragraph[3:]))
+                    pdf.ln(3)
+                elif paragraph.startswith('### '):
+                    pdf.set_font('Helvetica', 'B', 12)
+                    pdf.ln(4)
+                    pdf.multi_cell(0, 6, clean_text(paragraph[4:]))
+                    pdf.ln(2)
+                elif paragraph.startswith('- '):
+                    # Handle bullet points
+                    pdf.set_font('Helvetica', '', 10)
+                    for line in paragraph.split('\n'):
+                        if line.strip():
+                            pdf.ln(2)
+                            pdf.cell(5, 6, '-', ln=0)
+                            pdf.multi_cell(0, 6, clean_text(line[2:]))
                 else:
-                    content = section
-                
-                # Handle subsections (### level)
-                subsections = content.split('\n### ')
-                for subsection in subsections:
-                    if subsection.strip():
-                        if '###' in subsection:
-                            parts = subsection.split('\n', 1)
-                            pdf.set_font('Helvetica', 'B', 14)
-                            pdf.cell(0, 10, clean_text(parts[0].replace('#', '').strip()), ln=True)
-                            pdf.ln(5)
-                            text = parts[1] if len(parts) > 1 else ""
-                        else:
-                            text = subsection
-                        
-                        # Regular paragraphs
-                        pdf.set_font('Helvetica', '', 12)
-                        # Clean up markdown artifacts
-                        text = clean_text(text)
-                        text = text.replace('**', '')
-                        text = text.replace('*', '')
-                        text = text.replace('####', '')
-                        
-                        # Process paragraphs
-                        paragraphs = text.split('\n')
-                        for paragraph in paragraphs:
-                            if paragraph.strip():
-                                # Handle bullet points
-                                if paragraph.strip().startswith('-'):
-                                    pdf.ln(5)
-                                    pdf.cell(10, 5, '-', ln=0)
-                                    pdf.multi_cell(0, 5, clean_text(paragraph.strip()[1:].strip()))
-                                    pdf.ln(5)
-                                else:
-                                    # Regular paragraph
-                                    pdf.multi_cell(0, 5, clean_text(paragraph.strip()))
-                                    pdf.ln(5)
-                
-                pdf.ln(10)
-        
-        # Add page numbers
-        pdf.set_auto_page_break(auto=True, margin=15)
-        for page in range(1, pdf.page_no() + 1):
-            pdf.page = page
-            pdf.set_y(-15)
-            pdf.set_font('Helvetica', 'I', 8)
-            pdf.cell(0, 10, f'Page {page}', align='C')
-        
+                    # Regular paragraph
+                    pdf.set_font('Helvetica', '', 10)
+                    cleaned_text = clean_text(paragraph)
+                    if cleaned_text.strip():
+                        pdf.multi_cell(0, 6, cleaned_text)
+                        pdf.ln(3)
+            except Exception as e:
+                print(f"Warning: Skipping problematic text: {str(e)}")
+                continue
+
         pdf_path = chapter_dir / f"{title.lower().replace(' ', '_')}.pdf"
         pdf.output(str(pdf_path))
         return pdf_path
@@ -195,15 +201,22 @@ def main():
     # Generate book structure
     print("\nGenerating book structure...")
     structure_prompt = f"""
-    Create a book structure for a guide about {topic}. Return ONLY valid JSON in this exact format:
+    Create a complete book structure about {topic}. Consider the scope and complexity of the topic to determine the appropriate number of chapters.
+    Return ONLY valid JSON in this format:
     {{
-        "title": "Your Title Here",
+        "title": "An engaging and appropriate title",
         "chapters": [
-            {{"title": "Chapter 1 Title", "description": "Chapter 1 description"}},
-            {{"title": "Chapter 2 Title", "description": "Chapter 2 description"}},
-            {{"title": "Chapter 3 Title", "description": "Chapter 3 description"}}
+            {{"title": "Chapter title", "description": "Brief description of chapter content"}},
+            // Add as many chapters as needed for comprehensive coverage
         ]
     }}
+
+    Guidelines:
+    - Choose an appropriate number of chapters based on the topic
+    - Each chapter should have a clear focus and purpose
+    - Chapter titles should be engaging and descriptive
+    - Ensure logical flow and progression between chapters
+    - Consider the target audience when structuring
     """
     
     book_structure = generator.generate_text(structure_prompt)
@@ -212,12 +225,11 @@ def main():
         book_structure = json.loads(book_structure)
     except json.JSONDecodeError:
         print("Error: Could not parse the book structure. Using default structure.")
+        # Make the default structure more flexible
         book_structure = {
             "title": f"Guide to {topic}",
             "chapters": [
-                {"title": "Introduction", "description": "Overview"},
-                {"title": "Main Concepts", "description": "Core ideas"},
-                {"title": "Applications", "description": "Practical uses"}
+                {"title": "Introduction to " + topic, "description": "Overview and fundamentals"},
             ]
         }
     
