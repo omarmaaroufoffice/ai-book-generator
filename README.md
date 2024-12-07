@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # AI Book Generator
 
 An intelligent Python application that generates well-structured books using OpenAI's GPT models. The application creates professional PDFs with proper formatting, chapter organization, and content generation.
@@ -20,3 +21,7 @@ An intelligent Python application that generates well-structured books using Ope
 ## Installation
 
 1. Clone the repository: 
+=======
+# ai-book-generator
+AI Book Generator: An intelligent Python tool that automatically generates well-structured books using OpenAI's GPT models. This application creates professional PDFs with proper chapter organization, content generation, and formatting. Perfect for educational content, documentation, and rapid book prototyping.  
+>>>>>>> f03e167269727622eb3a1ad45ea9996a713def20
