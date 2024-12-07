@@ -1,0 +1,4 @@
+openai
+fpdf2
+python-dotenv
+PyPDF2 
